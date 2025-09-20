@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+
+    // Projects
+    match /projects/{projectId} {
+      allow read: if isSignedIn() && isProjectMember(projectId);
+      allow create: if isSignedIn() && request.resource.data.owner_id == uid();
+      allow update: if isSignedIn() && isProjectOwner(projectId);
+      allow delete: if isSignedIn() && isProjectOwner(projectId);
+    }
+
+    // Tasks (flat collection) - must belong to project user is member of
+    match /tasks/{taskId} {
+      allow read: if isSignedIn() && isProjectMember(resource.data.project_id);
+      allow create: if isSignedIn() && isProjectMember(request.resource.data.project_id);
+      allow update: if isSignedIn() && isTaskUpdatable();
+      allow delete: if isSignedIn() && isProjectOwner(resource.data.project_id);
+    }
+
+    // Members collection (flattened)
+    match /members/{memberId} {
+      allow read: if isSignedIn() && (resource.data.user_id == uid() || isProjectMember(resource.data.project_id));
+      allow create: if isSignedIn() && isProjectOwner(request.resource.data.project_id); // owner adds members (or via joinCode function)
+      allow update, delete: if false; // managed by server (functions)
+    }
+
+    // Activity (append-only)
+    match /activity/{activityId} {
+      allow read: if isSignedIn() && isProjectMember(resource.data.project_id);
+      allow create: if isSignedIn() && isProjectMember(request.resource.data.project_id);
+      allow update, delete: if false;
+    }
+
+    // Secure helper functions
+    function isProjectOwner(projectId) {
+      return exists(/databases/$(database)/documents/projects/$(projectId)) &&
+             get(/databases/$(database)/documents/projects/$(projectId)).data.owner_id == uid();
+    }
+
+    function isProjectMember(projectId) {
+      // Membership if owner or entry in members collection
+      return isProjectOwner(projectId) || exists(
+        /databases/$(database)/documents/members/$(projectId + '_' + uid())
+      );
+    }
+
+    function isTaskUpdatable() {
+      // allow owner or assignee to update
+      return isProjectOwner(resource.data.project_id) || resource.data.assignee_id == uid();
+    }
+  }
+}

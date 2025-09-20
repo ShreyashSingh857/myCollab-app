@@ -1,4 +1,42 @@
-import { createSlice } from '@reduxjs/toolkit'
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
+import { fetchMyTasks, createTask, updateTaskFields } from '../lib/api/dashboard'
+import { USE_FIREBASE } from '../config';
+import { listUserTasks, createTaskDoc, updateTaskDoc } from '../lib/firebaseServices/tasks';
+
+export const loadMyTasks = createAsyncThunk('tasks/loadMine', async (_, { getState, rejectWithValue }) => {
+  try {
+    const userId = getState().auth.user?.id;
+    if (!userId) return [];
+    if (USE_FIREBASE) {
+      return await listUserTasks(userId);
+    } else {
+      return await fetchMyTasks(userId);
+    }
+  } catch (e) { return rejectWithValue(e.message) }
+})
+
+export const createNewTask = createAsyncThunk('tasks/create', async (payload, { getState, rejectWithValue }) => {
+  try {
+    const userId = getState().auth.user?.id;
+    if (!userId) throw new Error('Not authenticated');
+    const full = { creator_id: userId, assignee_id: payload.assignee_id || userId, ...payload };
+    if (USE_FIREBASE) {
+      return await createTaskDoc(full);
+    } else {
+      return await createTask(full);
+    }
+  } catch (e) { return rejectWithValue(e.message) }
+})
+
+export const patchTask = createAsyncThunk('tasks/patch', async ({ id, fields }, { rejectWithValue }) => {
+  try {
+    if (USE_FIREBASE) {
+      return await updateTaskDoc(id, fields);
+    } else {
+      return await updateTaskFields(id, fields);
+    }
+  } catch (e) { return rejectWithValue(e.message) }
+})
 
 const initialState = {
   tasks: [],
@@ -43,9 +81,18 @@ const taskSlice = createSlice({
     setLoading: (state, action) => {
       state.loading = action.payload
     },
-    setError: (state, action) => {
-      state.error = action.payload
-    }
+    setError: (state, action) => { state.error = action.payload }
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(loadMyTasks.pending, (state) => { state.loading = true; state.error = null })
+      .addCase(loadMyTasks.fulfilled, (state, action) => { state.loading = false; state.tasks = action.payload })
+      .addCase(loadMyTasks.rejected, (state, action) => { state.loading = false; state.error = action.payload || 'Failed to load tasks' })
+      .addCase(createNewTask.fulfilled, (state, action) => { state.tasks.unshift(action.payload) })
+      .addCase(patchTask.fulfilled, (state, action) => {
+        const idx = state.tasks.findIndex(t => t.id === action.payload.id);
+        if (idx !== -1) state.tasks[idx] = action.payload;
+      })
   }
 })
 

@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { useDispatch } from 'react-redux'
-import { supabase } from '../../lib/supabase.js'
+import { auth, googleProvider } from '../../lib/firebase.js'
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, updateProfile } from 'firebase/auth'
 import { setLoading, setError } from '../../store/authSlice.js'
 import { FaLock, FaUser, FaEnvelope } from 'react-icons/fa'
+import FloatingDoodles from '../Decor/FloatingDoodles.jsx'
+import collaborationImg from '../../assets/collaboration_11473490.png'
 
 function Login() {
   const [isSignUp, setIsSignUp] = useState(false)
@@ -26,27 +29,13 @@ function Login() {
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName
-            }
-          }
-        })
-        
-        if (error) throw error
-        
-        setToast({ type: 'success', message: 'Check your email for verification link' })
+        const cred = await createUserWithEmailAndPassword(auth, email, password)
+        if (fullName) {
+          try { await updateProfile(cred.user, { displayName: fullName }) } catch (_) {}
+        }
+        setToast({ type: 'success', message: 'Account created' })
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        })
-        
-        if (error) throw error
-        
+        await signInWithEmailAndPassword(auth, email, password)
         setToast({ type: 'success', message: 'Successfully logged in' })
       }
     } catch (error) {
@@ -57,18 +46,56 @@ function Login() {
     }
   }
 
+  const handleGoogle = async () => {
+    try {
+      dispatch(setLoading(true))
+      setToast(null)
+      await signInWithPopup(auth, googleProvider)
+    } catch (e) {
+      setToast({ type: 'error', message: e.message })
+    } finally {
+      dispatch(setLoading(false))
+    }
+  }
+
   return (
-    <div className="auth-wrapper">
-      <div className="auth-card">
-        <div className="auth-header">
-          <h1>MyCollab</h1>
-          <p>{isSignUp ? 'Create your account' : 'Welcome back!'}</p>
+    <div className="auth-layout">
+      <div className="auth-panel brand">
+        <FloatingDoodles />
+        <div className="brand-inner">
+          <div className="logo-block">
+            <div className="logo-circle" style={{ padding:0, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <img src={collaborationImg} alt="MyCollab" style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'16px' }} />
+            </div>
+            <h1>MyCollab</h1>
+            <p className="tagline">Lightweight real-time team productivity.</p>
+          </div>
+          <ul className="feature-list">
+            <li><span>⚡</span> Live task updates</li>
+            <li><span>🗂️</span> Kanban & list views</li>
+            <li><span>👥</span> Team roles & sharing</li>
+            <li><span>📊</span> Progress insights</li>
+            <li><span>🔐</span> Secure OAuth sign-in</li>
+          </ul>
+          <footer className="brand-footer">© {new Date().getFullYear()} MyCollab</footer>
         </div>
-        {toast && (
-          <div className={`toast toast-${toast.type}`}>{toast.message}</div>
-        )}
-        <form onSubmit={handleAuth}>
-          <div className="form-grid">
+      </div>
+      <div className="auth-panel form">
+        <div className="form-shell">
+          <div className="form-heading">
+            <h2>{isSignUp ? 'Create your account' : 'Welcome back'}</h2>
+            <p>{isSignUp ? 'Join and start organizing your team.' : 'Sign in to continue working.'}</p>
+          </div>
+          {toast && <div className={`toast toast-${toast.type}`}>{toast.message}</div>}
+          <div className="oauth-stack">
+            <button type="button" className="oauth-btn google" onClick={handleGoogle}>
+              <img src="/google.svg" alt="Google" />
+              <span>Continue with Google</span>
+            </button>
+            <div className="or-separator"><span>or</span></div>
+          </div>
+          <form onSubmit={handleAuth} className="auth-form">
+            <div className="form-grid">
             {isSignUp && (
               <div className="form-control">
                 <label>Full Name</label>
@@ -125,22 +152,21 @@ function Login() {
                 </div>
               </div>
             )}
-            <button className="primary-btn" type="submit">
-              {isSignUp ? 'Sign Up' : 'Sign In'}
+              <button className="primary-btn large" type="submit">
+                {isSignUp ? 'Create Account' : 'Sign In'}
+              </button>
+            </div>
+          </form>
+          <div className="switch-auth alt">
+            <span>{isSignUp ? 'Already registered?' : 'New here?'}</span>
+            <button
+              type="button"
+              className="link-btn"
+              onClick={() => setIsSignUp(!isSignUp)}
+            >
+              {isSignUp ? 'Sign In' : 'Create account'}
             </button>
           </div>
-        </form>
-        <div className="switch-auth">
-          <span>
-            {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-          </span>
-          <button
-            type="button"
-            className="link-btn"
-            onClick={() => setIsSignUp(!isSignUp)}
-          >
-            {isSignUp ? 'Sign In' : 'Sign Up'}
-          </button>
         </div>
       </div>
     </div>

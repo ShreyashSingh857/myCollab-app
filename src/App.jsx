@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { supabase } from './lib/supabase.js'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
+import { auth } from './lib/firebase.js'
+import { onAuthStateChanged } from 'firebase/auth'
 import { setUser, setLoading } from './store/authSlice.js'
 
 // Components (we'll create these next)
@@ -12,35 +13,31 @@ import ProjectView from './components/Project/ProjectView.jsx'
 function App() {
   const dispatch = useDispatch()
   const { user, isAuthenticated, loading } = useSelector(state => state.auth)
+  const [authReady, setAuthReady] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
-    // Check if user is already logged in
-    const getSession = async () => {
-      dispatch(setLoading(true))
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        dispatch(setUser(session.user))
+    dispatch(setLoading(true))
+    const unsub = onAuthStateChanged(auth, (fbUser) => {
+      if (fbUser) {
+        // Normalize to shape used previously (id, email, etc.)
+        const norm = { id: fbUser.uid, email: fbUser.email, full_name: fbUser.displayName }
+        dispatch(setUser(norm))
+        if (location.pathname === '/login' || location.pathname === '/') navigate('/dashboard', { replace: true })
+      } else {
+        dispatch(setUser(null))
       }
       dispatch(setLoading(false))
-    }
+      setAuthReady(true)
+    })
+    return () => unsub()
+  }, [dispatch, navigate, location.pathname])
 
-    getSession()
+  // No Supabase OAuth params to clean for Firebase; keep hook empty for symmetry
+  useEffect(() => {}, [])
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          dispatch(setUser(session.user))
-        } else {
-          dispatch(setUser(null))
-        }
-      }
-    )
-
-    return () => subscription?.unsubscribe()
-  }, [dispatch])
-
-  if (loading) {
+  if (loading || !authReady) {
     return (
       <div className="fullscreen-center">
         <div className="spinner" />
