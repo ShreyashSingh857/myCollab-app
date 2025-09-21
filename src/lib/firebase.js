@@ -1,6 +1,5 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
 // Storage optional for later: import { getStorage } from 'firebase/storage';
 
 // Build config from Vite env vars. measurementId is optional (Analytics only)
@@ -16,12 +15,12 @@ const firebaseConfig = {
     : {}),
 };
 
+
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
-export const db = getFirestore(app);
-// export const storage = getStorage(app); // enable when needed
+// Note: Firestore removed per request; keep Firebase Auth only.
 
 // Lazy Analytics init (only in production & if supported)
 let analyticsInstance; // cached
@@ -38,3 +37,5 @@ export async function initAnalytics() {
   }
   return analyticsInstance ?? null;
 }
+
+// Firestore-related functionality removed — this project will use Supabase for data storage.

@@ -1,35 +1,27 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { fetchProjectsWithCounts, createProject, ensureOwnerMembership as ensureOwnerMembershipSQL } from '../lib/api/dashboard'
 import { USE_FIREBASE } from '../config';
-import { listUserProjectsWithCounts, createProjectDoc, ensureOwnerMembership as ensureOwnerMembershipFB } from '../lib/firebaseServices/projects';
-import { ensureOwnerMembership as ensureOwnerMembershipMemberFB } from '../lib/firebaseServices/membership';
+// Firestore removed: use SQL API (Supabase) for data storage
 
 export const loadProjects = createAsyncThunk('projects/loadAll', async (_, { getState, rejectWithValue }) => {
   try {
-    if (USE_FIREBASE) {
-      const userId = getState().auth.user?.id;
-      if (!userId) return [];
-      return await listUserProjectsWithCounts(userId);
-    } else {
-      return await fetchProjectsWithCounts();
-    }
+    // Use SQL (Supabase) for data storage
+    return await fetchProjectsWithCounts();
   } catch (e) { return rejectWithValue(e.message) }
 })
 
 export const createNewProject = createAsyncThunk('projects/create', async (payload, { getState, rejectWithValue }) => {
   try {
+    console.log('[createNewProject] start', payload);
     const userId = getState().auth.user?.id;
     if (!userId) throw new Error('Not authenticated');
-    if (USE_FIREBASE) {
-      const project = await createProjectDoc({ ...payload, owner_id: userId });
-      try { await ensureOwnerMembershipMemberFB(project.id, userId); } catch (_) {}
-      return { ...project, total: 0, done: 0, progress: 0 };
-    } else {
-      const project = await createProject({ ...payload, owner_id: userId });
-      try { await ensureOwnerMembershipSQL(project.id, userId); } catch (_) {}
-      return project;
-    }
-  } catch (e) { return rejectWithValue(e.message) }
+    const project = await createProject({ ...payload, owner_id: userId });
+    try { await ensureOwnerMembershipSQL(project.id, userId); } catch (_) {}
+    return project;
+  } catch (e) {
+    console.error('createNewProject error:', e);
+    return rejectWithValue(e.message)
+  }
 })
 
 const initialState = {

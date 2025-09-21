@@ -36,17 +36,26 @@ export async function listUserProjectsWithCounts(userId) {
 export async function createProjectDoc(data) {
   const col = collection(db, PROJECTS);
   const now = new Date();
-  const docRef = await addDoc(col, {
-    name: data.name,
-    owner_id: data.owner_id,
-    description: data.description || '',
-    join_code: data.join_code || null,
-    created_at: now.toISOString(),
-    updated_at: now.toISOString(),
-    status_counts: { todo: 0, in_progress: 0, done: 0 }
-  });
-  const snap = await getDoc(docRef);
-  return { id: docRef.id, ...snap.data() };
+  console.log('[projects.createProjectDoc] called with', data);
+  try {
+    const docRef = await addDoc(col, {
+      name: data.name,
+      owner_id: data.owner_id,
+      description: data.description || '',
+      join_code: data.join_code || null,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+      status_counts: { todo: 0, in_progress: 0, done: 0 }
+    });
+    console.log('[projects.createProjectDoc] addDoc done, id=', docRef.id);
+    const snap = await getDoc(docRef);
+    console.log('[projects.createProjectDoc] getDoc done');
+    return { id: docRef.id, ...snap.data() };
+  } catch (e) {
+    console.error('[projects.createProjectDoc] Firestore error', e);
+    // Surface a clearer, actionable message for the UI
+    throw new Error('Failed to write to Firestore. The project\'s Firestore database may not be created or available for this Firebase project. If you want to use Firestore in production you must enable Firestore for the project (may require enabling billing).');
+  }
 }
 
 export async function updateProjectDoc(id, fields) {
