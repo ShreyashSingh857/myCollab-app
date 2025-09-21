@@ -4,10 +4,8 @@
   "builds": [
     { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }
   ],
-  "routes": [
-    { "src": "/(.*)\\.(js|css|png|jpg|jpeg|gif|svg|ico|json|txt|webmanifest|woff|woff2|ttf)", "dest": "/$1.$2" },
-    { "handle": "filesystem" },
-    { "src": "/.*", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/.*", "destination": "/index.html" }
   ],
   "headers": [
     {
